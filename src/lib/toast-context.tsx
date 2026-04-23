@@ -42,10 +42,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       <div className="toast-container">
         {toasts.map((t) => (
           <div key={t.id} className={`toast toast-${t.type}`} onClick={() => removeToast(t.id)}>
-            <span style={{ flex: 1 }}>{t.message}</span>
-            <button 
-              style={{ background: 'none', border: 'none', cursor: 'pointer', opacity: 0.4 }}
+            <span style={{ flex: 1, lineHeight: 1.4 }}>{t.message}</span>
+            <button
+              style={{ background: 'none', border: 'none', cursor: 'pointer', opacity: 0.6, color: 'inherit', flexShrink: 0, padding: 0, fontSize: '0.875rem' }}
               onClick={(e) => { e.stopPropagation(); removeToast(t.id); }}
+              aria-label="Cerrar"
             >
               ✕
             </button>
