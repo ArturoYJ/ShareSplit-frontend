@@ -179,6 +179,13 @@ export class ApiError extends Error {
   }
 }
 
+// Module-level callback registered by AuthProvider on mount.
+// Invoked automatically when any API call returns 401.
+let unauthorizedHandler: (() => void) | null = null;
+export function setUnauthorizedHandler(fn: () => void): void {
+  unauthorizedHandler = fn;
+}
+
 export async function apiFetch<T>(endpoint: string, options: FetchOptions = {}): Promise<T> {
   const { token, ...fetchOptions } = options;
 
@@ -187,7 +194,10 @@ export async function apiFetch<T>(endpoint: string, options: FetchOptions = {}):
     headers.set('Content-Type', 'application/json');
   }
 
-  if (token) {
+  // Only set Bearer when token is a real JWT (3-part dot-separated string).
+  // After a page refresh the auth-context stores a sentinel value so route guards
+  // stay truthy while the actual httpOnly cookie authenticates the request.
+  if (token && token.split('.').length === 3) {
     headers.set('Authorization', `Bearer ${token}`);
   }
 
@@ -203,6 +213,9 @@ export async function apiFetch<T>(endpoint: string, options: FetchOptions = {}):
   const payload = (hasJson ? await response.json() : {}) as ApiErrorPayload;
 
   if (!response.ok) {
+    if (response.status === 401 && unauthorizedHandler) {
+      unauthorizedHandler();
+    }
     throw new ApiError(response.status, payload);
   }
 
@@ -220,9 +233,8 @@ export const authApi = {
       method: 'POST',
       body: JSON.stringify(user),
     }),
-  /** Obtiene el perfil actual. Si se llama sin token, la cookie ss_token autentica la request.
-   *  La respuesta incluye token para restaurar la sesión en memoria. */
-  me: (token?: string) => apiFetch<{ user: User; token: string | null }>('/auth/me', { token }),
+  /** Obtiene el perfil actual. La cookie httpOnly ss_token autentica la request automáticamente. */
+  me: (token?: string) => apiFetch<{ user: User }>('/auth/me', { token }),
   updateMe: (data: UpdateMeInput, token: string) =>
     apiFetch<{ user: User }>('/auth/me', {
       method: 'PATCH',
