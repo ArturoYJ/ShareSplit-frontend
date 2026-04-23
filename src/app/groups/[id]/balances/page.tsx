@@ -142,8 +142,8 @@ export default function BalancesPage() {
             <h1 className="h1" style={{ marginTop: 8 }}>Balances y Deudas</h1>
           </div>
           {myRole === 'owner' && (
-            <button className="btn btn-primary" onClick={settleAll} disabled={settling} style={{ gap: 10 }}>
-              <span>🔐</span> {settling ? 'Liquidando...' : 'Cerrar y Liquidar'}
+            <button className="btn btn-primary" onClick={settleAll} disabled={settling}>
+              {settling ? 'Liquidando...' : 'Cerrar y liquidar'}
             </button>
           )}
         </div>
@@ -152,9 +152,7 @@ export default function BalancesPage() {
           {balances.map((balance) => (
             <article className="card" key={balance.user_id}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
-                <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--primary)', color: 'white', display: 'grid', placeItems: 'center', fontWeight: 700 }}>
-                  {balance.name[0]}
-                </div>
+                <div className="avatar">{balance.name[0]}</div>
                 <div>
                   <h3 className="h3" style={{ fontSize: '1.1rem' }}>{balance.name}</h3>
                   <span style={{ fontSize: '0.8rem', color: balance.net_balance >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 700 }}>
@@ -167,7 +165,7 @@ export default function BalancesPage() {
                   </p>
                 </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, paddingTop: 16, borderTop: '1px solid #f1f5f9' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, paddingTop: 16, borderTop: '1px solid var(--line)' }}>
                 <div>
                   <p className="muted" style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Pagó</p>
                   <p style={{ fontWeight: 600 }}>${balance.total_paid.toFixed(2)}</p>
@@ -184,9 +182,8 @@ export default function BalancesPage() {
         <section className="card" style={{ padding: 32 }}>
           <h2 className="h3" style={{ marginBottom: 24 }}>Deudas Simplificadas</h2>
           {debts.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '24px 0' }}>
-              <span style={{ fontSize: '2rem' }}>🎉</span>
-              <p className="muted" style={{ marginTop: 8 }}>¡No hay deudas pendientes en este grupo!</p>
+            <div style={{ textAlign: 'center', padding: '32px 16px', border: '1px dashed var(--line)', borderRadius: 10 }}>
+              <p className="muted">Sin deudas pendientes en este grupo.</p>
             </div>
           ) : (
             <div className="stack" style={{ gap: 16 }}>
@@ -197,14 +194,11 @@ export default function BalancesPage() {
                 return (
                   <div className="card-flat" style={{ padding: '20px 24px' }} key={key}>
                     <div className="justify-between row-mobile">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                        <span style={{ fontSize: '1.5rem' }}>💸</span>
-                        <div>
-                          <p style={{ fontSize: '1.1rem' }}>
-                            <b>{debt.from_name}</b> debe a <b>{debt.to_name}</b>
-                          </p>
-                          <p className="muted" style={{ fontSize: '0.85rem' }}>Transferencia o efectivo recomendado</p>
-                        </div>
+                      <div>
+                        <p style={{ fontWeight: 600, fontSize: '0.9375rem', marginBottom: 3 }}>
+                          {debt.from_name} → {debt.to_name}
+                        </p>
+                        <p className="muted" style={{ fontSize: '0.8125rem' }}>Transferencia o efectivo</p>
                       </div>
                       <div className="row-wrap" style={{ alignItems: 'center', gap: 20 }}>
                         <span style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text)' }}>
