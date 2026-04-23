@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState } from 'react';
-import { authApi, User } from './api';
+import { authApi, User, setUnauthorizedHandler } from './api';
 
 interface AuthContextType {
   user: User | null;
@@ -20,27 +20,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   // ── Restaurar sesión al montar ─────────────────────────────────────────────
-  // Ya no leemos de localStorage. Llamamos a /auth/me con `credentials: 'include'`
-  // para que la cookie httpOnly ss_token autentique la petición automáticamente.
-  // El backend retorna { user, token } para que podamos restaurar el estado en memoria.
+  // Llama a /auth/me con credentials: 'include' para que la cookie httpOnly
+  // ss_token autentique la petición automáticamente (sin localStorage).
   useEffect(() => {
     let mounted = true;
 
     async function bootstrap() {
       try {
-        const profile = await authApi.me(); // sin token → usa cookie
+        const profile = await authApi.me(); // no token arg — relies on cookie
         if (!mounted) return;
-
         setUser(profile.user);
-        if (profile.token) setToken(profile.token);
+        // Token lives only in memory; cookie handles re-auth on next mount
+        setToken('cookie'); // non-null sentinel so route guards treat user as authenticated
       } catch {
-        // Cookie ausente, expirada o inválida → usuario no autenticado
+        // Cookie absent, expired, or invalid → unauthenticated; this is expected
+        // for any page load without an active session, NOT a mid-session expiry.
         if (mounted) {
           setUser(null);
           setToken(null);
         }
       } finally {
-        if (mounted) setLoading(false);
+        if (mounted) {
+          setLoading(false);
+          // Register AFTER bootstrap so the expected 401 from /auth/me on an
+          // unauthenticated page load never triggers a redirect loop.
+          // From this point, any 401 means a session that was valid just expired.
+          setUnauthorizedHandler(() => {
+            setToken(null);
+            setUser(null);
+            if (typeof window !== 'undefined') {
+              const publicPaths = ['/', '/login', '/register'];
+              if (!publicPaths.includes(window.location.pathname)) {
+                window.location.href = '/login';
+              }
+            }
+          });
+        }
       }
     }
 
@@ -72,11 +87,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // ── Refrescar perfil (ej: después de PATCH /auth/me) ──────────────────────
   const refreshMe = async () => {
     try {
-      const profile = await authApi.me(token ?? undefined);
+      const profile = await authApi.me();
       setUser(profile.user);
-      if (profile.token) setToken(profile.token);
     } catch {
-      // Ignorar errores silenciosos en refresh
+      // Silent refresh failure — session restored on next mount via cookie
     }
   };
 
