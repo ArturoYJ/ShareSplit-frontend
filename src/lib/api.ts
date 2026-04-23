@@ -1,6 +1,8 @@
 interface FetchOptions extends RequestInit {
   token?: string;
 }
+// src/lib/api.ts — agregar al inicio del archivo
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api';
 
 export interface User {
   id: string;
@@ -262,8 +264,13 @@ export const groupsApi = {
 };
 
 export const expensesApi = {
-  list: (groupId: string, token: string) =>
-    apiFetch<{ expenses: ExpenseListItem[] }>(`/groups/${groupId}/expenses`, { token }),
+  list: (groupId: string, token: string, params?: { page?: number; limit?: number }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.append('page', params.page.toString());
+    if (params?.limit) searchParams.append('limit', params.limit.toString());
+    const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    return apiFetch<PaginatedExpensesResponse>(`/groups/${groupId}/expenses${query}`, { token });
+  },
   create: (groupId: string, expense: ExpenseCreateInput, token: string) =>
     apiFetch<{ expense: { id: string } }>(`/groups/${groupId}/expenses`, {
       method: 'POST',
