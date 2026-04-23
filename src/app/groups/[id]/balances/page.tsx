@@ -1,165 +1,266 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { useAuth } from "@/lib/auth-context";
-import { balancesApi, groupsApi } from "@/lib/api";
-import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import { useParams, useRouter } from 'next/navigation';
+import {
+  ApiError,
+  BalanceRow,
+  DebtRow,
+  PaymentRow,
+  balancesApi,
+  groupsApi,
+} from '@/lib/api';
+import { useAuth } from '@/lib/auth-context';
+import { useToast } from '@/lib/toast-context';
 
 export default function BalancesPage() {
-  const { id } = useParams();
-  const { token, authLoading }: any = useAuth();
-  const [balances, setBalances] = useState<any[]>([]);
-  const [debts, setDebts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [payingDebt, setPayingDebt] = useState<any>(null);
-  const [paymentLoading, setPaymentLoading] = useState(false);
+  const params = useParams<{ id: string }>();
+  const groupId = params.id;
+
+  const { token, user, loading: authLoading } = useAuth();
   const router = useRouter();
 
-  useEffect(() => {
-    if (!authLoading && !token) {
-      router.push("/login");
-    } else if (token) {
-      fetchData();
-    }
-  }, [authLoading, token, id]);
+  const [balances, setBalances] = useState<BalanceRow[]>([]);
+  const [debts, setDebts] = useState<DebtRow[]>([]);
+  const [payments, setPayments] = useState<PaymentRow[]>([]);
+  const [myRole, setMyRole] = useState<'owner' | 'member'>('member');
 
-  const fetchData = async () => {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
+  const [paying, setPaying] = useState<string | null>(null);
+  const [settling, setSettling] = useState(false);
+  const { success, error: toastError } = useToast();
+
+  const fetchData = useCallback(async () => {
+    if (!token) return;
+
     try {
-      const data = await balancesApi.get(id as string, token!);
-      setBalances(data.balances);
-      setDebts(data.debts);
+      const [balancesRes, paymentsRes, groupRes] = await Promise.all([
+        balancesApi.get(groupId, token),
+        balancesApi.getPayments(groupId, token),
+        groupsApi.get(groupId, token),
+      ]);
+
+      setBalances(balancesRes.balances);
+      setDebts(balancesRes.debts);
+      setPayments(paymentsRes.payments);
+
+      const me = groupRes.members.find((member) => member.id === user?.id);
+      setMyRole(me?.role || 'member');
+      setError('');
     } catch (err) {
-      console.error(err);
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError('No se pudieron cargar los balances del grupo.');
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, [token, groupId, user]);
 
-  const handleRecordPayment = async () => {
-    setPaymentLoading(true);
+  useEffect(() => {
+    if (authLoading) return;
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void fetchData();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [authLoading, token, router, fetchData]);
+
+  const myDebts = useMemo(
+    () => debts.filter((debt) => debt.from_user_id === user?.id),
+    [debts, user]
+  );
+
+  const registerPayment = async (debt: DebtRow) => {
+    if (!token) return;
+
+    setPaying(`${debt.from_user_id}-${debt.to_user_id}`);
+    setError('');
+    setInfo('');
+
     try {
-      await balancesApi.pay(id as string, {
-        receiver_id: payingDebt.to,
-        amount: parseFloat(payingDebt.amount),
-        notes: `Liquidación de deuda via ShareSplit`
-      }, token!);
-      setPayingDebt(null);
-      fetchData();
+      await balancesApi.pay(
+        groupId,
+        {
+          to_user_id: debt.to_user_id,
+          amount: Number(debt.amount),
+          note: 'Pago registrado desde ShareSplit',
+        },
+        token
+      );
+      success('¡Pago registrado con éxito!');
+      await fetchData();
     } catch (err) {
-      console.error(err);
+      if (err instanceof ApiError) {
+        toastError(err.message);
+      } else {
+        toastError('No se pudo registrar el pago.');
+      }
     } finally {
-      setPaymentLoading(false);
+      setPaying(null);
     }
   };
 
-  if (loading) {
+  const settleAll = async () => {
+    if (!token) return;
+
+    setSettling(true);
+    setError('');
+    try {
+      const result = await balancesApi.settleAll(groupId, token);
+      success(result.message);
+      await fetchData();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        toastError(err.message);
+      } else {
+        toastError('No se pudo liquidar el grupo.');
+      }
+    } finally {
+      setSettling(false);
+    }
+  };
+
+  if (authLoading || loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
+      <main className="page centered">
+        <p className="muted">Calculando balances...</p>
+      </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-gradient-main px-6 py-12">
-      <div className="mx-auto max-w-5xl">
-        <Link href={`/groups/${id}`} className="text-slate-500 hover:text-white text-sm flex items-center gap-1 mb-8 animate-fade-in">
-          ← Volver al grupo
-        </Link>
+    <main className="page">
+      <section className="shell stack" style={{ gap: 14 }}>
+        <div className="justify-between row-mobile">
+          <div>
+            <Link href={`/groups/${groupId}`} className="muted" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span>←</span> Volver al grupo
+            </Link>
+            <h1 className="h1" style={{ marginTop: 8 }}>Balances y Deudas</h1>
+          </div>
+          {myRole === 'owner' && (
+            <button className="btn btn-primary" onClick={settleAll} disabled={settling} style={{ gap: 10 }}>
+              <span>🔐</span> {settling ? 'Liquidando...' : 'Cerrar y Liquidar'}
+            </button>
+          )}
+        </div>
 
-        <h1 className="text-4xl font-black mb-4 animate-fade-in">Balances y Deudas</h1>
-        <p className="text-slate-400 mb-12 animate-fade-in">Algoritmo de simplificación activado para minimizar transferencias.</p>
+        <section className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 20 }}>
+          {balances.map((balance) => (
+            <article className="card" key={balance.user_id}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
+                <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--primary)', color: 'white', display: 'grid', placeItems: 'center', fontWeight: 700 }}>
+                  {balance.name[0]}
+                </div>
+                <div>
+                  <h3 className="h3" style={{ fontSize: '1.1rem' }}>{balance.name}</h3>
+                  <span style={{ fontSize: '0.8rem', color: balance.net_balance >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 700 }}>
+                    {balance.net_balance >= 0 ? 'A favor' : 'En contra'}
+                  </span>
+                </div>
+                <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
+                  <p className="kpi-value" style={{ fontSize: '1.5rem', color: balance.net_balance >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                    {balance.net_balance >= 0 ? '+' : ''}${balance.net_balance.toFixed(2)}
+                  </p>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, paddingTop: 16, borderTop: '1px solid #f1f5f9' }}>
+                <div>
+                  <p className="muted" style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Pagó</p>
+                  <p style={{ fontWeight: 600 }}>${balance.total_paid.toFixed(2)}</p>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <p className="muted" style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>Consumió</p>
+                  <p style={{ fontWeight: 600 }}>${balance.total_owed.toFixed(2)}</p>
+                </div>
+              </div>
+            </article>
+          ))}
+        </section>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Net Balances */}
-          <section className="animate-fade-in [animation-delay:100ms]">
-            <h2 className="text-2xl font-bold mb-6">Resumen por persona</h2>
-            <div className="space-y-3">
-              {balances.map((balance, i) => (
-                <div key={i} className="glass p-5 rounded-2xl flex items-center justify-between">
-                  <div>
-                    <p className="font-bold">{balance.name}</p>
-                    <div className="flex gap-4 text-[10px] uppercase tracking-wider text-slate-500 font-bold mt-1">
-                      <span>Pagó: ${parseFloat(balance.total_paid).toFixed(2)}</span>
-                      <span>Consumió: ${parseFloat(balance.total_consumed).toFixed(2)}</span>
+        <section className="card" style={{ padding: 32 }}>
+          <h2 className="h3" style={{ marginBottom: 24 }}>Deudas Simplificadas</h2>
+          {debts.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '24px 0' }}>
+              <span style={{ fontSize: '2rem' }}>🎉</span>
+              <p className="muted" style={{ marginTop: 8 }}>¡No hay deudas pendientes en este grupo!</p>
+            </div>
+          ) : (
+            <div className="stack" style={{ gap: 16 }}>
+              {debts.map((debt) => {
+                const key = `${debt.from_user_id}-${debt.to_user_id}`;
+                const canPay = debt.from_user_id === user?.id;
+
+                return (
+                  <div className="card-flat" style={{ padding: '20px 24px' }} key={key}>
+                    <div className="justify-between row-mobile">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                        <span style={{ fontSize: '1.5rem' }}>💸</span>
+                        <div>
+                          <p style={{ fontSize: '1.1rem' }}>
+                            <b>{debt.from_name}</b> debe a <b>{debt.to_name}</b>
+                          </p>
+                          <p className="muted" style={{ fontSize: '0.85rem' }}>Transferencia o efectivo recomendado</p>
+                        </div>
+                      </div>
+                      <div className="row-wrap" style={{ alignItems: 'center', gap: 20 }}>
+                        <span style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text)' }}>
+                          ${Number(debt.amount).toFixed(2)}
+                        </span>
+                        {canPay && (
+                          <button
+                            className="btn btn-primary"
+                            onClick={() => registerPayment(debt)}
+                            disabled={paying === key}
+                            style={{ padding: '10px 20px' }}
+                          >
+                            {paying === key ? '...' : 'Pagar'}
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
-                  <div className={`text-xl font-black ${
-                    parseFloat(balance.net_balance) >= 0 ? 'text-green-400' : 'text-accent'
-                  }`}>
-                    {parseFloat(balance.net_balance) >= 0 ? '+' : ''}
-                    ${parseFloat(balance.net_balance).toFixed(2)}
-                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        <section className="card" style={{ padding: 16 }}>
+          <h2 className="h3" style={{ marginBottom: 10 }}>Historial de pagos</h2>
+          {payments.length === 0 ? (
+            <p className="muted" style={{ margin: 0 }}>Aún no hay pagos registrados.</p>
+          ) : (
+            <div className="stack" style={{ gap: 10 }}>
+              {payments.map((payment) => (
+                <div className="card-flat" key={payment.id} style={{ padding: 12 }}>
+                  <p style={{ margin: 0 }}>
+                    <b>{payment.from_name}</b> pagó <b>${Number(payment.amount).toFixed(2)}</b> a <b>{payment.to_name}</b>
+                  </p>
+                  <p className="muted" style={{ margin: '4px 0 0', fontSize: '.85rem' }}>
+                    {new Date(payment.paid_at).toLocaleString('es-MX')}
+                    {payment.note ? ` · ${payment.note}` : ''}
+                  </p>
                 </div>
               ))}
             </div>
-          </section>
+          )}
+        </section>
 
-          {/* Debt Simplification */}
-          <section className="animate-fade-in [animation-delay:200ms]">
-            <h2 className="text-2xl font-bold mb-6">Quién debe a quién</h2>
-            {debts.length === 0 ? (
-              <div className="glass p-12 rounded-3xl text-center">
-                <p className="text-slate-400">No hay deudas pendientes. ✨</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {debts.map((debt, i) => (
-                  <div key={i} className="glass p-6 rounded-3xl border-l-4 border-l-accent flex items-center justify-between">
-                    <div>
-                      <p className="text-slate-300 font-medium">
-                        <span className="text-white font-bold">{debt.from_name}</span> le debe a
-                      </p>
-                      <p className="text-xl font-black text-white">{debt.to_name}</p>
-                    </div>
-                    <div className="text-right flex items-center gap-6">
-                      <div className="text-3xl font-black text-accent">${debt.amount}</div>
-                      <button 
-                        onClick={() => setPayingDebt(debt)}
-                        className="btn-secondary py-2 px-4 text-xs"
-                      >
-                        Liquidar
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        </div>
-      </div>
-
-      {/* Payment Confirmation Modal */}
-      {payingDebt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/80 backdrop-blur-md">
-          <div className="glass w-full max-w-sm p-8 rounded-3xl animate-fade-in">
-            <h3 className="text-2xl font-bold mb-4">Confirmar pago</h3>
-            <p className="text-slate-400 mb-8 text-sm">
-              ¿Confirmas que <span className="text-white font-bold">{payingDebt.from_name}</span> ya le transfirió 
-              <span className="text-primary font-bold"> ${payingDebt.amount}</span> a 
-              <span className="text-white font-bold"> {payingDebt.to_name}</span>?
-            </p>
-            
-            <div className="flex gap-2">
-              <button 
-                disabled={paymentLoading}
-                onClick={() => setPayingDebt(null)}
-                className="btn-secondary flex-1"
-              >
-                No, cancelar
-              </button>
-              <button 
-                disabled={paymentLoading}
-                onClick={handleRecordPayment} 
-                className="btn-primary flex-1"
-              >
-                {paymentLoading ? "Guardando..." : "Sí, confirmar"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+        {myDebts.length > 0 && (
+          <p className="muted" style={{ margin: 0, fontSize: '.88rem' }}>
+            Puedes registrar pagos en las deudas donde apareces como deudor.
+          </p>
+        )}
+      </section>
     </main>
   );
 }

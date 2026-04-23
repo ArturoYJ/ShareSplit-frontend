@@ -1,153 +1,392 @@
 'use client';
 
-import { useEffect, useState, use } from 'react';
-import { useAuthStore } from '@/lib/store';
-import { ChevronLeft, Plus, Receipt, Copy, CheckCircle2 } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
+import { useParams, useRouter } from 'next/navigation';
+import {
+  ApiError,
+  BalanceRow,
+  ExpenseListItem,
+  GroupDetailResponse,
+  balancesApi,
+  expensesApi,
+  groupsApi,
+} from '@/lib/api';
+import { useAuth } from '@/lib/auth-context';
+import { useToast } from '@/lib/toast-context';
 
-export default function GroupDetail({ params }: { params: Promise<{ id: string }> }) {
-  const unwrappedParams = use(params);
-  const groupId = unwrappedParams.id;
-  const [group, setGroup] = useState<any>(null);
-  const [balances, setBalances] = useState<any[]>([]);
+function statusLabel(status: 'draft' | 'open' | 'settled') {
+  if (status === 'draft') return 'Borrador';
+  if (status === 'open') return 'Abierto';
+  return 'Liquidado';
+}
+
+function statusClass(status: 'draft' | 'open' | 'settled') {
+  if (status === 'draft') return 'badge badge-draft';
+  if (status === 'open') return 'badge badge-open';
+  return 'badge badge-settled';
+}
+
+export default function GroupDetailPage() {
+  const params = useParams<{ id: string }>();
+  const groupId = params.id;
+  const router = useRouter();
+  const { token, user, loading: authLoading } = useAuth();
+
+  const [groupData, setGroupData] = useState<GroupDetailResponse | null>(null);
+  const [expenses, setExpenses] = useState<ExpenseListItem[]>([]);
+  const [pagination, setPagination] = useState({ page: 1, total_pages: 1, total_count: 0 });
+  const [balances, setBalances] = useState<BalanceRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
   const [copied, setCopied] = useState(false);
-  const { user } = useAuthStore();
+  const [transferTarget, setTransferTarget] = useState('');
+  const [busyAction, setBusyAction] = useState<string | null>(null);
+  const { success, error: toastError } = useToast();
+
+  const fetchData = useCallback(async (targetPage = page) => {
+    if (!token || !groupId) return;
+
+    try {
+      const [groupRes, expensesRes, balancesRes] = await Promise.all([
+        groupsApi.get(groupId, token),
+        expensesApi.list(groupId, token, { page: targetPage, limit: 10 }),
+        balancesApi.get(groupId, token),
+      ]);
+
+      setGroupData(groupRes);
+      setExpenses(expensesRes.expenses);
+      setPagination(expensesRes.pagination);
+      setBalances(balancesRes.balances);
+      setError('');
+    } catch (err) {
+      if (err instanceof ApiError) {
+        toastError(err.message);
+      } else {
+        toastError('No fue posible cargar este grupo.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [token, groupId, page]);
+
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage);
+    void fetchData(newPage);
+  };
 
   useEffect(() => {
-    // Mock group data
-    setGroup({
-      id: groupId,
-      name: groupId === '1' ? 'Weekend Trip' : 'Group ' + groupId,
-      code: 'A1B2C3',
-      expenses: [
-        { id: '1', description: 'Dinner', payer: { name: 'Alice' }, totalAmount: 45.50 },
-        { id: '2', description: 'Gas', payer: { name: 'Bob' }, totalAmount: 30.00 }
-      ]
-    });
+    if (authLoading) return;
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void fetchData();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [authLoading, token, router, fetchData]);
 
-    // Mock balances
-    setBalances([
-      { user: { id: 'u1', name: 'Alice' }, balance: 15.50 },
-      { user: { id: 'u2', name: 'Bob' }, balance: -5.00 },
-      { user: { id: 'u3', name: 'Charlie' }, balance: -10.50 }
-    ]);
-  }, [groupId]);
+  const myMember = useMemo(() => {
+    return groupData?.members.find((member) => member.id === user?.id) ?? null;
+  }, [groupData, user]);
 
-  const copyCode = () => {
-    if (group?.code) {
-      navigator.clipboard.writeText(group.code);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+  const myBalance = useMemo(() => {
+    if (!user) return null;
+    return balances.find((balance) => balance.user_id === user.id) ?? null;
+  }, [balances, user]);
+
+  const isOwner = myMember?.role === 'owner';
+
+  const copyInvite = async () => {
+    if (!groupData?.group.invite_code) return;
+    await navigator.clipboard.writeText(groupData.group.invite_code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  const handleApiAction = async (actionKey: string, action: () => Promise<void>) => {
+    setBusyAction(actionKey);
+    try {
+      await action();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        toastError(err.message);
+      } else {
+        toastError('No se pudo completar la acción.');
+      }
+    } finally {
+      setBusyAction(null);
     }
   };
 
-  if (!group) {
+  const handleRemoveMember = async (memberId: string, memberName: string) => {
+    if (!token) return;
+    if (!window.confirm(`¿Expulsar a ${memberName} del grupo?`)) return;
+
+    await handleApiAction(`remove-${memberId}`, async () => {
+      const result = await groupsApi.removeMember(groupId, memberId, token);
+      success(result.message);
+      await fetchData();
+    });
+  };
+
+  const handleTransferOwner = async () => {
+    if (!token || !transferTarget) return;
+    const target = groupData?.members.find((m) => m.id === transferTarget);
+    if (!target) return;
+
+    if (!window.confirm(`¿Transferir ownership a ${target.name}? Esta acción cambia tu rol a miembro.`)) return;
+
+    await handleApiAction('transfer-owner', async () => {
+      const result = await groupsApi.transferOwner(groupId, transferTarget, token);
+      success(result.message);
+      setTransferTarget('');
+      await fetchData();
+    });
+  };
+
+  const handleLeaveGroup = async () => {
+    if (!token || !user) return;
+    if (!window.confirm('¿Seguro que quieres abandonar este grupo?')) return;
+
+    await handleApiAction('leave-group', async () => {
+      const result = await groupsApi.leave(groupId, user.id, token);
+      success(result.message);
+      router.push('/dashboard');
+    });
+  };
+
+  const handleDeleteGroup = async () => {
+    if (!token) return;
+    if (!window.confirm('¿Eliminar grupo permanentemente? Esta acción no se puede deshacer.')) return;
+
+    await handleApiAction('delete-group', async () => {
+      const result = await groupsApi.delete(groupId, token);
+      success(result.message);
+      router.push('/dashboard');
+    });
+  };
+
+  if (authLoading || loading) {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-      </div>
+      <main className="page centered">
+        <p className="muted">Cargando grupo...</p>
+      </main>
     );
   }
 
   return (
-    <div className="flex-1 flex flex-col pt-4 pb-24">
-      <header className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <Link href="/">
-            <button className="p-2 glass-button rounded-full">
-              <ChevronLeft size={24} />
-            </button>
-          </Link>
-          <h1 className="text-2xl font-bold truncate max-w-[200px]">{group.name}</h1>
-        </div>
-        <button 
-          onClick={copyCode}
-          className="flex items-center gap-2 px-3 py-1.5 glass-button rounded-full text-sm font-medium"
-        >
-          {copied ? <CheckCircle2 size={16} className="text-green-400" /> : <Copy size={16} />}
-          <span className="font-mono tracking-wider">{group.code}</span>
-        </button>
-      </header>
-
-      {/* Financial Summary */}
-      <section className="mb-8">
-        <h3 className="text-lg font-bold mb-3">Balances</h3>
-        <div className="glass-panel p-4 flex gap-4 overflow-x-auto snap-x hide-scrollbar">
-          {balances.map(b => {
-            const isOwed = b.balance > 0;
-            const owes = b.balance < 0;
-            const settled = b.balance === 0;
-
-            return (
-              <div key={b.user.id} className="min-w-[140px] snap-center bg-white/5 rounded-xl p-4 border border-white/10 shrink-0">
-                <p className="font-semibold text-sm truncate">{b.user.name}</p>
-                <div className="mt-2">
-                  {settled && <span className="text-text-muted text-sm">Settled up</span>}
-                  {isOwed && <span className="text-green-400 font-bold">Gets +${b.balance.toFixed(2)}</span>}
-                  {owes && <span className="text-red-400 font-bold">Owes -${Math.abs(b.balance).toFixed(2)}</span>}
-                </div>
+    <main className="page">
+      <section className="shell stack" style={{ gap: 16 }}>
+          <div className="justify-between row-mobile">
+            <div>
+              <Link href="/dashboard" className="muted" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span>←</span> Dashboard
+              </Link>
+              <h1 className="h1" style={{ marginTop: 8 }}>{groupData?.group.name || 'Grupo'}</h1>
+              <div className="row-wrap" style={{ marginTop: 8, alignItems: 'center' }}>
+                <span className="badge badge-open">Grupo Activo</span>
+                <span className="muted">Rol: <b>{myMember?.role === 'owner' ? '👑 Dueño' : '👤 Miembro'}</b></span>
               </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* Expenses List */}
-      <section className="flex-1">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-bold">Expenses</h3>
-        </div>
-
-        {group.expenses?.length === 0 ? (
-          <div className="glass-panel p-8 text-center mt-4">
-            <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-4">
-              <Receipt size={32} className="text-text-muted" />
             </div>
-            <p className="text-text-muted">No expenses yet. Add one to get started!</p>
+
+            <div className="row-wrap">
+              <button className="btn btn-secondary" onClick={copyInvite} style={{ gap: 10 }}>
+                <span>📋</span>
+                {copied ? '¡Copiado!' : `Invitar: ${groupData?.group.invite_code || '---'}`}
+              </button>
+              <Link href={`/groups/${groupId}/expenses/new`} className="btn btn-primary" style={{ gap: 10 }}>
+                <span>➕</span> Nuevo gasto
+              </Link>
+            </div>
           </div>
-        ) : (
-          <div className="space-y-4">
-            {group.expenses?.map((exp: any) => (
-              <Link href={`/groups/${groupId}/expenses/${exp.id}`} key={exp.id}>
-                <motion.div 
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="glass-panel p-4 flex items-center justify-between cursor-pointer"
+
+        {/* Notificaciones via Toast ahora */}
+
+        <section className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
+          <article className="kpi card">
+            <span className="muted" style={{ fontWeight: 600 }}>Miembros</span>
+            <div className="justify-between">
+              <p className="kpi-value">{groupData?.members.length ?? 0}</p>
+              <span style={{ fontSize: '2rem' }}>👥</span>
+            </div>
+          </article>
+          <article className="kpi card">
+            <span className="muted" style={{ fontWeight: 600 }}>Gastos Totales</span>
+            <div className="justify-between">
+              <p className="kpi-value">{pagination.total_count}</p>
+              <span style={{ fontSize: '2rem' }}>🧾</span>
+            </div>
+          </article>
+          <article className="kpi card" style={{ background: (myBalance?.net_balance || 0) >= 0 ? 'rgba(16, 185, 129, 0.05)' : 'rgba(239, 68, 68, 0.05)' }}>
+            <span className="muted" style={{ fontWeight: 600 }}>Mi Saldo Neto</span>
+            <div className="justify-between">
+              <p className="kpi-value" style={{ color: (myBalance?.net_balance || 0) >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                {(myBalance?.net_balance || 0) >= 0 ? '+' : ''}${(myBalance?.net_balance || 0).toFixed(2)}
+              </p>
+              <span style={{ fontSize: '2rem' }}>💰</span>
+            </div>
+          </article>
+        </section>
+
+        <section className="card" style={{ padding: 16 }}>
+          <div className="justify-between" style={{ marginBottom: 20 }}>
+            <h2 className="h3">Integrantes del Equipo</h2>
+            <div className="row-wrap">
+              {!isOwner && (
+                <button
+                  className="btn btn-secondary"
+                  onClick={handleLeaveGroup}
+                  disabled={busyAction === 'leave-group'}
+                  style={{ color: 'var(--danger)' }}
                 >
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center">
-                      <Receipt size={20} className="text-primary" />
+                  {busyAction === 'leave-group' ? 'Saliendo...' : 'Abandonar'}
+                </button>
+              )}
+              {isOwner && (
+                <button
+                  className="btn btn-danger"
+                  onClick={handleDeleteGroup}
+                  disabled={busyAction === 'delete-group'}
+                >
+                  {busyAction === 'delete-group' ? 'Eliminando...' : 'Eliminar Grupo'}
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="stack" style={{ gap: 12 }}>
+            {groupData?.members.map((member) => (
+              <div className="card-flat" key={member.id} style={{ padding: '14px 18px' }}>
+                <div className="justify-between">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--primary)', color: 'white', display: 'grid', placeItems: 'center', fontWeight: 700 }}>
+                      {member.name[0]}
                     </div>
                     <div>
-                      <h4 className="font-bold">{exp.description}</h4>
-                      <p className="text-sm text-text-muted">Paid by {exp.payer?.name}</p>
+                      <p style={{ fontWeight: 600 }}>{member.name} {member.id === user?.id && <span className="muted">(tú)</span>}</p>
+                      <p className="muted" style={{ fontSize: '0.8rem' }}>{member.role === 'owner' ? '👑 Administrador' : '👤 Miembro'}</p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-bold text-lg">${exp.totalAmount.toFixed(2)}</p>
-                  </div>
-                </motion.div>
-              </Link>
+                  {isOwner && member.role !== 'owner' && (
+                    <button
+                      className="btn btn-secondary"
+                      onClick={() => handleRemoveMember(member.id, member.name)}
+                      disabled={busyAction === `remove-${member.id}`}
+                      style={{ padding: '8px 12px', fontSize: '0.85rem' }}
+                    >
+                      {busyAction === `remove-${member.id}` ? '...' : 'Remover'}
+                    </button>
+                  )}
+                </div>
+              </div>
             ))}
           </div>
-        )}
-      </section>
 
-      <div className="fixed bottom-8 left-0 right-0 px-4 max-w-md mx-auto">
-        <Link href={`/groups/${groupId}/expenses/create`}>
-          <button className="w-full py-4 primary-gradient text-white shadow-lg shadow-violet-500/30 rounded-xl font-bold text-lg flex items-center justify-center gap-2">
-            <Plus size={24} />
-            Add Expense
-          </button>
-        </Link>
-      </div>
-      
-      {/* Styles for hiding scrollbar in this specific element, standard cross-browser */}
-      <style dangerouslySetInnerHTML={{__html: `
-        .hide-scrollbar::-webkit-scrollbar { display: none; }
-        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-      `}} />
-    </div>
+          {isOwner && (
+            <div className="stack" style={{ marginTop: 14, gap: 8 }}>
+              <span className="label">Transferir ownership</span>
+              <div className="row-wrap">
+                <select
+                  className="select"
+                  value={transferTarget}
+                  onChange={(e) => setTransferTarget(e.target.value)}
+                  style={{ minWidth: 260 }}
+                >
+                  <option value="">Selecciona un miembro</option>
+                  {groupData?.members
+                    .filter((m) => m.role !== 'owner')
+                    .map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}
+                      </option>
+                    ))}
+                </select>
+                <button
+                  className="btn btn-secondary"
+                  disabled={!transferTarget || busyAction === 'transfer-owner'}
+                  onClick={handleTransferOwner}
+                >
+                  {busyAction === 'transfer-owner' ? 'Transfiriendo...' : 'Transferir'}
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+
+        <section className="card" style={{ padding: 24 }}>
+          <div className="justify-between" style={{ marginBottom: 20 }}>
+            <h2 className="h3">Historial de Gastos</h2>
+            <Link href={`/groups/${groupId}/expenses/new`} className="btn btn-primary" style={{ padding: '8px 16px' }}>
+              <span>+</span> Agregar
+            </Link>
+          </div>
+
+          {expenses.length === 0 ? (
+            <div className="centered" style={{ padding: '40px 0', border: '2px dashed var(--line)', borderRadius: 20 }}>
+              <p className="muted">No hay gastos registrados. ¡Empieza por agregar uno!</p>
+            </div>
+          ) : (
+            <div className="stack" style={{ gap: 12 }}>
+              {expenses.map((expense) => (
+                <Link
+                  key={expense.id}
+                  href={`/groups/${groupId}/expenses/${expense.id}`}
+                  className="card-flat"
+                  style={{ padding: '18px 20px', textDecoration: 'none', color: 'inherit' }}
+                >
+                  <div className="justify-between row-mobile" style={{ alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                      <div style={{ width: 48, height: 48, borderRadius: 12, background: '#f1f5f9', display: 'grid', placeItems: 'center', fontSize: '1.2rem' }}>
+                        {expense.status === 'settled' ? '✅' : '⏳'}
+                      </div>
+                      <div>
+                        <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>{expense.title}</h3>
+                        <p className="muted" style={{ fontSize: '0.85rem', marginTop: 4 }}>
+                          Pagado por <b>{expense.paid_by_name}</b> · {new Date(expense.expense_date).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}
+                        </p>
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <p style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: 'var(--text)' }}>
+                        ${Number(expense.total_amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </p>
+                      <span className={statusClass(expense.status)} style={{ marginTop: 6, display: 'inline-block' }}>
+                        {statusLabel(expense.status)}
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+
+          {pagination.total_pages > 1 && (
+            <div className="row-wrap" style={{ marginTop: 20, justifyContent: 'center' }}>
+              <button
+                className="btn btn-secondary"
+                disabled={page <= 1}
+                onClick={() => handlePageChange(page - 1)}
+              >
+                Anterior
+              </button>
+              <span className="muted" style={{ padding: '0 12px' }}>
+                Página {page} de {pagination.total_pages}
+              </span>
+              <button
+                className="btn btn-secondary"
+                disabled={page >= pagination.total_pages}
+                onClick={() => handlePageChange(page + 1)}
+              >
+                Siguiente
+              </button>
+            </div>
+          )}
+        </section>
+      </section>
+    </main>
   );
 }
