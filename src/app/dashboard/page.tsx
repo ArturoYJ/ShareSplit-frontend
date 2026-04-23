@@ -14,7 +14,6 @@ export default function DashboardPage() {
 
   const [groups, setGroups] = useState<GroupSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
   const [showJoin, setShowJoin] = useState(false);
   const [joinCode, setJoinCode] = useState('');
@@ -36,7 +35,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, toastError]);
 
   useEffect(() => {
     if (authLoading) return;
