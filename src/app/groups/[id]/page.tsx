@@ -39,8 +39,6 @@ export default function GroupDetailPage() {
   const [balances, setBalances] = useState<BalanceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [error, setError] = useState('');
-  const [info, setInfo] = useState('');
   const [copied, setCopied] = useState(false);
   const [transferTarget, setTransferTarget] = useState('');
   const [busyAction, setBusyAction] = useState<string | null>(null);
@@ -58,9 +56,12 @@ export default function GroupDetailPage() {
 
       setGroupData(groupRes);
       setExpenses(expensesRes.expenses);
-      setPagination(expensesRes.pagination);
+      setPagination({
+        page: expensesRes.page,
+        total_count: expensesRes.total,
+        total_pages: Math.ceil(expensesRes.total / expensesRes.limit) || 1
+      });
       setBalances(balancesRes.balances);
-      setError('');
     } catch (err) {
       if (err instanceof ApiError) {
         toastError(err.message);
@@ -70,7 +71,7 @@ export default function GroupDetailPage() {
     } finally {
       setLoading(false);
     }
-  }, [token, groupId, page]);
+  }, [token, groupId, page, toastError]);
 
   const handlePageChange = (newPage: number) => {
     setPage(newPage);
