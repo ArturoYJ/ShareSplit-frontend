@@ -27,8 +27,7 @@ export default function BalancesPage() {
   const [myRole, setMyRole] = useState<'owner' | 'member'>('member');
 
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [info, setInfo] = useState('');
+
   const [paying, setPaying] = useState<string | null>(null);
   const [settling, setSettling] = useState(false);
   const { success, error: toastError } = useToast();
@@ -49,17 +48,16 @@ export default function BalancesPage() {
 
       const me = groupRes.members.find((member) => member.id === user?.id);
       setMyRole(me?.role || 'member');
-      setError('');
     } catch (err) {
       if (err instanceof ApiError) {
-        setError(err.message);
+        toastError(err.message);
       } else {
-        setError('No se pudieron cargar los balances del grupo.');
+        toastError('No se pudieron cargar los balances del grupo.');
       }
     } finally {
       setLoading(false);
     }
-  }, [token, groupId, user]);
+  }, [token, groupId, user, toastError]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -82,8 +80,6 @@ export default function BalancesPage() {
     if (!token) return;
 
     setPaying(`${debt.from_user_id}-${debt.to_user_id}`);
-    setError('');
-    setInfo('');
 
     try {
       await balancesApi.pay(
@@ -112,7 +108,6 @@ export default function BalancesPage() {
     if (!token) return;
 
     setSettling(true);
-    setError('');
     try {
       const result = await balancesApi.settleAll(groupId, token);
       success(result.message);
