@@ -1,13 +1,11 @@
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-import "./globals.css";
-import { AuthProvider } from "@/lib/auth-context";
-
-const inter = Inter({ subsets: ["latin"] });
+import type { Metadata } from 'next';
+import './globals.css';
+import { AuthProvider } from '@/lib/auth-context';
+import { ToastProvider } from '@/lib/toast-context';
 
 export const metadata: Metadata = {
-  title: "ShareSplit — Divide gastos, no amistades",
-  description: "La forma más justa y granular de dividir gastos grupales.",
+  title: 'ShareSplit | Divide gastos por consumo real',
+  description: 'La forma más justa de dividir cuentas en grupo.',
 };
 
 export default function RootLayout({
@@ -17,10 +15,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es">
-      <body className={inter.className}>
-        <AuthProvider>
-          {children}
-        </AuthProvider>
+      <body>
+        <ToastProvider>
+          <AuthProvider>{children}</AuthProvider>
+        </ToastProvider>
       </body>
     </html>
   );
