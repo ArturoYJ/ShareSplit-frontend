@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ApiError, authApi } from '@/lib/api';
@@ -8,50 +8,55 @@ import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, token, loading: authLoading } = useAuth();
   const { error: toastError, success } = useToast();
   const router = useRouter();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const [email, setEmail]       = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState('');
+
+  useEffect(() => {
+    if (!authLoading && token) router.replace('/dashboard');
+  }, [authLoading, token, router]);
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
     setLoading(true);
     setError('');
 
     try {
       const data = await authApi.login({ email, password });
       login(data.token, data.user);
-      success(`¡Bienvenido de nuevo, ${data.user.name}!`);
+      success(`Bienvenido de nuevo, ${data.user.name.split(' ')[0]}`);
       router.push('/dashboard');
     } catch (err) {
-      if (err instanceof ApiError) {
-        toastError(err.message);
-        setError(err.message);
-      } else {
-        toastError('No fue posible conectar con el servidor.');
-        setError('Error de conexión.');
-      }
+      const msg = err instanceof ApiError ? err.message : 'Error de conexión.';
+      setError(msg);
+      toastError(msg);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <main className="page centered" style={{ background: 'linear-gradient(135deg, #f8faff 0%, #eef2ff 100%)' }}>
-      <section className="card" style={{ width: 'min(440px, 94vw)', padding: 48, borderRadius: 32 }}>
-        <div className="stack" style={{ gap: 32 }}>
-          <div className="text-center">
-            <h1 className="h1" style={{ fontSize: '2.2rem', marginBottom: 8 }}>ShareSplit</h1>
-            <p className="muted">Inicia sesión para continuar</p>
-          </div>
+    <main className="page centered">
+      <div style={{ width: 'min(400px, 100%)', display: 'flex', flexDirection: 'column', gap: 24 }}>
 
-          <form onSubmit={handleSubmit} className="stack" style={{ gap: 20 }}>
-            <div className="stack" style={{ gap: 8 }}>
-              <label className="label">Correo Electrónico</label>
+        {/* Header */}
+        <div style={{ textAlign: 'center' }}>
+          <h1 className="h2" style={{ marginBottom: 4 }}>Iniciar sesión</h1>
+          <p className="muted">Accede a tus grupos y gastos.</p>
+        </div>
+
+        {/* Form card */}
+        <div className="card" style={{ padding: 28 }}>
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div>
+              <label className="label" htmlFor="email">Correo electrónico</label>
               <input
+                id="email"
                 className="input"
                 type="email"
                 placeholder="tu@email.com"
@@ -62,9 +67,10 @@ export default function LoginPage() {
               />
             </div>
 
-            <div className="stack" style={{ gap: 8 }}>
-              <label className="label">Contraseña</label>
+            <div>
+              <label className="label" htmlFor="password">Contraseña</label>
               <input
+                id="password"
                 className="input"
                 type="password"
                 placeholder="••••••••"
@@ -75,32 +81,28 @@ export default function LoginPage() {
               />
             </div>
 
-            {error && (
-              <div className="error-box" style={{ padding: '12px 16px', borderRadius: 12, fontSize: '0.9rem' }}>
-                {error}
-              </div>
-            )}
+            {error && <div className="error-box">{error}</div>}
 
-            <button 
-              className="btn btn-primary" 
-              type="submit" 
+            <button
+              className="btn btn-primary"
+              type="submit"
               disabled={loading}
-              style={{ padding: '16px', fontSize: '1rem', marginTop: 8 }}
+              style={{ width: '100%', padding: '10px', marginTop: 4 }}
             >
-              {loading ? 'Verificando...' : 'Iniciar Sesión'}
+              {loading ? 'Verificando...' : 'Entrar'}
             </button>
           </form>
-
-          <div className="text-center" style={{ borderTop: '1px solid #eee', paddingTop: 24 }}>
-            <p className="muted" style={{ fontSize: '0.95rem' }}>
-              ¿Aún no tienes una cuenta?{' '}
-              <Link href="/register" style={{ color: 'var(--primary)', fontWeight: 700 }}>
-                Regístrate gratis
-              </Link>
-            </p>
-          </div>
         </div>
-      </section>
+
+        {/* Footer link */}
+        <p className="muted" style={{ textAlign: 'center', fontSize: '0.875rem' }}>
+          ¿Sin cuenta?{' '}
+          <Link href="/register" style={{ color: 'var(--primary)', fontWeight: 600 }}>
+            Regístrate gratis
+          </Link>
+        </p>
+
+      </div>
     </main>
   );
 }
