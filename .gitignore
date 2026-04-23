@@ -8,14 +8,20 @@
 # production
 /build
 
+# env (secretos locales; dejamos que *.example se commiteen)
+.env
+.env.local
+.env.*.local
+
 # misc
 .DS_Store
-.env*
 
 # logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+
+# generated
 /src/generated/prisma
 *.tsbuildinfo
