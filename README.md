@@ -1,13 +1,47 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [create-next-app](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ShareSplit Frontend
 
-## Getting Started
+Aplicación web en Next.js para gestión de gastos compartidos por consumo individual.
 
-First, run the development server:
+## Scripts
 
 ```bash
-npm run dev
+npm run dev        # desarrollo
+npm run lint       # lint
+npm run build      # build de producción
+npm run start      # servidor producción
+npm run test:e2e   # E2E críticos (Playwright)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Variables de entorno
 
-You can start editing the page by modifying `src/app/page.tsx`. The page auto-updates as you edit the file.
+Crear `.env.local`:
+
+```bash
+NEXT_PUBLIC_API_URL=http://localhost:3001/api
+```
+
+## E2E críticos
+
+Los tests E2E usan:
+
+- `E2E_BASE_URL` (default: `http://localhost:3000`)
+- `E2E_API_URL` (default: `http://localhost:3001/api`)
+
+Ejemplo:
+
+```bash
+E2E_BASE_URL=http://localhost:3000 \
+E2E_API_URL=http://localhost:3001/api \
+npm run test:e2e
+```
+
+## Flujo funcional cubierto
+
+- Login con JWT
+- Crear/unirse a grupo
+- Ver detalle de grupo y miembros
+- Registrar gasto por ítems
+- Reclamar consumos
+- Ver balances/deudas
+- Registrar pagos
+- Gestión de miembros (expulsar, transferir ownership, abandonar, eliminar grupo)
