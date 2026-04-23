@@ -1,166 +1,188 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { useAuth } from "@/lib/auth-context";
-import { groupsApi } from "@/lib/api";
-import Link from "next/link";
+import { FormEvent, useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { ApiError, GroupSummary, groupsApi } from '@/lib/api';
+import { useAuth } from '@/lib/auth-context';
+import { useToast } from '@/lib/toast-context';
 
-export default function Dashboard() {
+export default function DashboardPage() {
   const { user, token, loading: authLoading, logout } = useAuth();
-  const [groups, setGroups] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [inviteCode, setInviteCode] = useState("");
-  const [showJoinModal, setShowJoinModal] = useState(false);
-  const [joinError, setJoinError] = useState("");
+  const { error: toastError, success } = useToast();
   const router = useRouter();
 
-  useEffect(() => {
-    if (!authLoading && !token) {
-      router.push("/login");
-    } else if (token) {
-      fetchGroups();
-    }
-  }, [authLoading, token]);
+  const [groups, setGroups] = useState<GroupSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const fetchGroups = async () => {
+  const [showJoin, setShowJoin] = useState(false);
+  const [joinCode, setJoinCode] = useState('');
+  const [joinLoading, setJoinLoading] = useState(false);
+  const [joinError, setJoinError] = useState('');
+
+  const fetchGroups = useCallback(async () => {
+    if (!token) return;
+
     try {
-      const data = await groupsApi.list(token!);
+      const data = await groupsApi.list(token);
       setGroups(data.groups);
     } catch (err) {
-      console.error(err);
+      if (err instanceof ApiError) {
+        toastError(err.message);
+      } else {
+        toastError('No se pudieron cargar tus grupos.');
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
 
-  const handleJoinGroup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setJoinError("");
+  useEffect(() => {
+    if (authLoading) return;
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void fetchGroups();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [authLoading, token, router, fetchGroups]);
+
+  const handleJoin = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!token) return;
+
+    setJoinLoading(true);
+    setJoinError('');
+
     try {
-      await groupsApi.join(inviteCode, token!);
-      setInviteCode("");
-      setShowJoinModal(false);
-      fetchGroups();
-    } catch (err: any) {
-      setJoinError(err.message);
+      await groupsApi.join(joinCode.trim().toUpperCase(), token);
+      success('¡Te has unido al grupo correctamente!');
+      setJoinCode('');
+      setShowJoin(false);
+      await fetchGroups();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setJoinError(err.message);
+      } else {
+        setJoinError('No fue posible unirte al grupo.');
+      }
+    } finally {
+      setJoinLoading(false);
     }
   };
 
   if (authLoading || loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
+      <main className="page centered">
+        <p className="muted">Cargando...</p>
+      </main>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-main px-6 py-12">
-      <div className="mx-auto max-w-5xl">
-        {/* Header */}
-        <header className="flex items-center justify-between mb-12 animate-fade-in">
-          <div>
-            <h1 className="text-3xl font-bold">Hola, <span className="text-primary">{user?.name}</span></h1>
-            <p className="text-slate-400">Gestiona tus grupos y gastos compartidos.</p>
-          </div>
-          <button onClick={logout} className="text-slate-400 hover:text-accent text-sm font-medium transition-colors">
-            Cerrar sesión
-          </button>
-        </header>
-
-        {/* Action Cards */}
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 mb-12 animate-fade-in [animation-delay:100ms]">
-          <Link href="/groups/new" className="glass p-8 rounded-3xl group hover:border-primary/50 transition-all">
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/20 text-primary group-hover:bg-primary group-hover:text-white transition-all">
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
+    <main className="page">
+      <div className="shell stack" style={{ gap: 18 }}>
+        <section className="card" style={{ padding: '32px 40px', border: 'none', background: 'linear-gradient(135deg, white 0%, #f1f5f9 100%)' }}>
+          <div className="justify-between row-mobile">
+            <div>
+              <h1 className="h1" style={{ fontSize: '2.5rem' }}>Hola, {user?.name.split(' ')[0]} 👋</h1>
+              <p className="muted" style={{ marginTop: 8, fontSize: '1.1rem' }}>Tienes {groups.length} grupos activos actualmente.</p>
             </div>
-            <h3 className="text-xl font-bold mb-2">Crear nuevo grupo</h3>
-            <p className="text-slate-400 text-sm">Empieza un nuevo viaje o evento y agrega a tus amigos.</p>
-          </Link>
-
-          <button 
-            onClick={() => setShowJoinModal(true)}
-            className="glass p-8 rounded-3xl text-left group hover:border-secondary/50 transition-all"
-          >
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-secondary/20 text-secondary group-hover:bg-secondary group-hover:text-white transition-all">
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-            </div>
-            <h3 className="text-xl font-bold mb-2">Unirse con código</h3>
-            <p className="text-slate-400 text-sm">Ingresa el código que te compartieron tus amigos.</p>
-          </button>
-        </div>
-
-        {/* Groups List */}
-        <div className="animate-fade-in [animation-delay:200ms]">
-          <h2 className="text-2xl font-bold mb-6">Mis Grupos</h2>
-          
-          {groups.length === 0 ? (
-            <div className="glass p-12 rounded-3xl text-center">
-              <p className="text-slate-400 mb-6">Aún no eres miembro de ningún grupo.</p>
-              <Link href="/groups/new" className="btn-primary">
-                Crear mi primer grupo
+            <div className="row-wrap">
+              <button className="btn btn-secondary" onClick={() => setShowJoin(true)} style={{ gap: 10 }}>
+                <span>🔑</span> Unirme
+              </button>
+              <Link href="/groups/new" className="btn btn-primary" style={{ gap: 10 }}>
+                <span>✨</span> Nuevo grupo
               </Link>
+              <button className="btn btn-secondary" onClick={() => void logout()} style={{ color: 'var(--danger)' }}>
+                Salir
+              </button>
             </div>
+          </div>
+        </section>
+
+        <h2 className="h3" style={{ marginTop: 12 }}>Mis Grupos</h2>
+
+        <section className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))' }}>
+          {groups.length === 0 ? (
+            <article className="card" style={{ padding: 48, textAlign: 'center', gridColumn: '1 / -1' }}>
+              <div style={{ fontSize: '3rem', marginBottom: 16 }}>🤝</div>
+              <h2 className="h2">Comienza la aventura</h2>
+              <p className="muted" style={{ maxWidth: 400, margin: '12px auto 24px' }}>Comparte gastos con amigos de forma justa. Crea tu primer grupo ahora.</p>
+              <div className="row-wrap" style={{ justifyContent: 'center' }}>
+                <Link href="/groups/new" className="btn btn-primary">Crear mi primer grupo</Link>
+                <button className="btn btn-secondary" onClick={() => setShowJoin(true)}>Unirme a uno</button>
+              </div>
+            </article>
           ) : (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              {groups.map((group) => (
-                <Link 
-                  key={group.id} 
-                  href={`/groups/${group.id}`}
-                  className="glass p-6 rounded-2xl hover:bg-white/5 transition-colors border-l-4 border-l-primary"
-                >
-                  <h4 className="font-bold text-lg mb-1">{group.name}</h4>
-                  <div className="flex items-center justify-between text-xs text-slate-500">
-                    <span>{group.member_count} miembros</span>
-                    <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full uppercase tracking-wider font-bold">
-                      {group.invite_code}
-                    </span>
+            groups.map((group) => (
+              <Link href={`/groups/${group.id}`} key={group.id} className="card-flat" style={{ padding: 24, textDecoration: 'none', color: 'inherit' }}>
+                <div className="stack" style={{ gap: 16 }}>
+                  <div className="justify-between">
+                    <div style={{ width: 48, height: 48, borderRadius: 12, background: 'var(--primary)', color: 'white', display: 'grid', placeItems: 'center', fontSize: '1.5rem' }}>
+                      🏔️
+                    </div>
+                    <span className="badge badge-open" style={{ alignSelf: 'start' }}>{group.role === 'owner' ? 'Admin' : 'Miembro'}</span>
                   </div>
-                </Link>
-              ))}
-            </div>
+                  <div>
+                    <h3 className="h2" style={{ fontSize: '1.4rem' }}>{group.name}</h3>
+                    <p className="muted" style={{ marginTop: 4 }}>{group.member_count} personas integradas</p>
+                  </div>
+                  <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span className="muted" style={{ fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase' }}>Código</span>
+                    <code style={{ fontWeight: 800, color: 'var(--primary)', letterSpacing: 1 }}>{group.invite_code}</code>
+                  </div>
+                </div>
+              </Link>
+            ))
           )}
-        </div>
+        </section>
       </div>
 
-      {/* Join Modal */}
-      {showJoinModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm">
-          <div className="glass w-full max-w-sm p-8 rounded-3xl animate-fade-in">
-            <h3 className="text-2xl font-bold mb-4">Unirse a un grupo</h3>
-            <form onSubmit={handleJoinGroup} className="flex flex-col gap-4">
-              <input 
-                type="text" 
-                placeholder="Código (ej: A1B2C3D4)"
-                maxLength={8}
-                autoFocus
-                className="text-center text-xl uppercase tracking-widest font-mono"
-                value={inviteCode}
-                onChange={(e) => setInviteCode(e.target.value)}
-                required
-              />
-              {joinError && <p className="text-accent text-xs">{joinError}</p>}
-              <div className="flex gap-2">
-                <button 
-                  type="button" 
-                  onClick={() => setShowJoinModal(false)}
-                  className="btn-secondary flex-1"
-                >
-                  Cancelar
-                </button>
-                <button type="submit" className="btn-primary flex-1">
-                  Unirse
-                </button>
+      {showJoin && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 23, 42, 0.6)',
+            backdropFilter: 'blur(8px)',
+            zIndex: 2000,
+            display: 'grid',
+            placeItems: 'center',
+            padding: 16,
+          }}
+        >
+          <section className="card" style={{ width: 'min(440px, 94vw)', padding: 32, boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
+            <div className="justify-between" style={{ marginBottom: 8 }}>
+              <h3 className="h2" style={{ fontSize: '1.5rem' }}>Unirse a un grupo</h3>
+              <button className="btn btn-secondary" onClick={() => setShowJoin(false)} style={{ padding: 8, borderRadius: '50%' }}>✕</button>
+            </div>
+            <p className="muted">Ingresa el código de invitación para empezar a dividir gastos.</p>
+            <form onSubmit={handleJoin} className="stack" style={{ marginTop: 24 }}>
+              <div>
+                <label className="label">Código de Invitación</label>
+                <input
+                  className="input"
+                  value={joinCode}
+                  onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                  maxLength={8}
+                  style={{ textTransform: 'uppercase', letterSpacing: 4, textAlign: 'center', fontSize: '1.25rem', fontWeight: 800 }}
+                  placeholder="XXXXXXXX"
+                  required
+                />
               </div>
+              {joinError && <div className="error-box" style={{ marginTop: 0 }}>{joinError}</div>}
+              <button type="submit" className="btn btn-primary" disabled={joinLoading} style={{ width: '100%', padding: 16 }}>
+                {joinLoading ? 'Procesando...' : 'Unirse al Grupo'}
+              </button>
             </form>
-          </div>
+          </section>
         </div>
       )}
-    </div>
+    </main>
   );
 }
