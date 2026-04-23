@@ -1,57 +1,62 @@
-import Link from "next/link";
+'use client';
 
-export default function Home() {
+import Link from 'next/link';
+import { useAuth } from '@/lib/auth-context';
+
+export default function HomePage() {
+  const { user, token } = useAuth();
+
   return (
-    <main className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-gradient-main px-6">
-      {/* Decorative background elements */}
-      <div className="absolute top-[-10%] left-[-10%] h-[500px] w-[500px] rounded-full bg-primary/20 blur-[120px]" />
-      <div className="absolute bottom-[-10%] right-[-10%] h-[500px] w-[500px] rounded-full bg-secondary/10 blur-[120px]" />
+    <main className="page">
+      <section className="shell grid" style={{ gap: 22 }}>
+        <article className="card" style={{ padding: '30px 28px' }}>
+          <p className="muted" style={{ margin: 0, fontWeight: 700 }}>ShareSplit</p>
+          <h1 className="h1" style={{ marginTop: 10 }}>
+            Divide gastos con justicia por consumo real.
+          </h1>
+          <p className="muted" style={{ maxWidth: 720, fontSize: '1.05rem', lineHeight: 1.5 }}>
+            Crea grupos, registra tickets por ítem, deja que cada persona reclame lo que consumió y obtén balances claros de quién le debe a quién.
+          </p>
 
-      <div className="z-10 max-w-3xl text-center animate-fade-in">
-        <h1 className="mb-6 text-6xl font-extrabold tracking-tight sm:text-7xl">
-          Share<span className="text-gradient">Split</span>
-        </h1>
-
-        <p className="mb-10 text-xl text-slate-400 sm:text-2xl leading-relaxed">
-          Divide gastos con precisión milimétrica.
-          Cada quien paga <span className="text-white font-medium">exactamente lo que consumió</span>,
-          sin dramas ni divisiones injustas.
-        </p>
-
-        <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-          <Link href="/register" className="btn-primary w-full sm:w-auto text-lg">
-            Empezar ahora
-          </Link>
-          <Link href="/login" className="btn-secondary w-full sm:w-auto text-lg">
-            Iniciar sesión
-          </Link>
-        </div>
-
-        <div className="mt-20 grid grid-cols-1 gap-8 text-left sm:grid-cols-3">
-          <div className="glass p-6 rounded-2xl">
-            <div className="text-secondary text-2xl mb-2 font-bold">Granular</div>
-            <p className="text-slate-400 text-sm">
-              Desglosa el ticket ítem por ítem. Reclama solo lo que es tuyo.
-            </p>
+          <div className="row-wrap" style={{ marginTop: 12 }}>
+            {token ? (
+              <Link className="btn btn-primary" href="/dashboard">
+                Ir a mi dashboard
+              </Link>
+            ) : (
+              <>
+                <Link className="btn btn-primary" href="/register">
+                  Crear cuenta
+                </Link>
+                <Link className="btn btn-secondary" href="/login">
+                  Iniciar sesión
+                </Link>
+              </>
+            )}
           </div>
-          <div className="glass p-6 rounded-2xl">
-            <div className="text-primary text-2xl mb-2 font-bold">Transparente</div>
-            <p className="text-slate-400 text-sm">
-              Cálculos automáticos de quién debe a quién en tiempo real.
-            </p>
-          </div>
-          <div className="glass p-6 rounded-2xl">
-            <div className="text-accent text-2xl mb-2 font-bold">Sencillo</div>
-            <p className="text-slate-400 text-sm">
-              Crea un grupo, invita a tus amigos y liquida deudas con un click.
-            </p>
-          </div>
-        </div>
-      </div>
 
-      <footer className="absolute bottom-8 text-slate-500 text-sm">
-        © 2026 ShareSplit — Diseñado para una convivencia financiera justa.
-      </footer>
+          {user && (
+            <p className="muted" style={{ marginTop: 12, fontSize: '.95rem' }}>
+              Sesión activa como <b>{user.name}</b>.
+            </p>
+          )}
+        </article>
+
+        <section className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))' }}>
+          <article className="kpi">
+            <p className="muted" style={{ margin: 0, fontWeight: 700 }}>Registro granular</p>
+            <p style={{ margin: 0 }}>Cada gasto se captura línea por línea, no solo con un total global.</p>
+          </article>
+          <article className="kpi">
+            <p className="muted" style={{ margin: 0, fontWeight: 700 }}>Claims por usuario</p>
+            <p style={{ margin: 0 }}>Cada miembro marca solo lo que consumió; si comparten, se divide automáticamente.</p>
+          </article>
+          <article className="kpi">
+            <p className="muted" style={{ margin: 0, fontWeight: 700 }}>Liquidación transparente</p>
+            <p style={{ margin: 0 }}>Visualiza deudas simplificadas y registra pagos para cerrar cuentas.</p>
+          </article>
+        </section>
+      </section>
     </main>
   );
 }
