@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
 
 interface DraftItem {
+  id: string; // stable UI key — not sent to backend
   name: string;
   unit_price: string;
   quantity: string;
@@ -26,7 +27,7 @@ export default function NewExpensePage() {
   const [expenseDate, setExpenseDate] = useState(new Date().toISOString().slice(0, 10));
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState<DraftItem[]>([
-    { name: '', unit_price: '', quantity: '1' },
+    { id: crypto.randomUUID(), name: '', unit_price: '', quantity: '1' },
   ]);
 
   const [loading, setLoading] = useState(false);
@@ -47,7 +48,7 @@ export default function NewExpensePage() {
   }, [items]);
 
   const addItem = () => {
-    setItems((prev) => [...prev, { name: '', unit_price: '', quantity: '1' }]);
+    setItems((prev) => [...prev, { id: crypto.randomUUID(), name: '', unit_price: '', quantity: '1' }]);
   };
 
   const removeItem = (index: number) => {
@@ -174,7 +175,7 @@ export default function NewExpensePage() {
 
               {items.map((item, index) => (
                 <div
-                  key={`${index}-${item.name}`}
+                  key={item.id}
                   className="card-flat"
                   style={{ padding: 20, display: 'grid', gap: 16, gridTemplateColumns: '2fr 1fr 1fr auto', alignItems: 'end' }}
                 >
