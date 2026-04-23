@@ -11,6 +11,7 @@ import {
   groupsApi,
 } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import ConfirmModal from '@/components/ConfirmModal';
 
 function statusLabel(status: 'draft' | 'open' | 'settled') {
   if (status === 'draft') return 'Borrador';
@@ -40,6 +41,7 @@ export default function ExpenseDetailPage() {
   const [error, setError] = useState('');
   const [actionError, setActionError] = useState('');
   const [actionInfo, setActionInfo] = useState('');
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!token) return;
@@ -113,11 +115,8 @@ export default function ExpenseDetailPage() {
 
   const handleDeleteExpense = async () => {
     if (!token) return;
-    if (!window.confirm('¿Eliminar este gasto? Esta acción no se puede deshacer.')) return;
-
     setActionError('');
     setActionInfo('');
-
     try {
       await expensesApi.delete(groupId, expenseId, token);
       router.push(`/groups/${groupId}`);
@@ -227,7 +226,11 @@ export default function ExpenseDetailPage() {
             <div className="stack" style={{ marginTop: 12, gap: 8 }}>
               {error && <div className="error-box">{error}</div>}
               {actionError && <div className="error-box">{actionError}</div>}
-              {actionInfo && <div className="info-box">{actionInfo}</div>}
+              {actionInfo && (
+                <div style={{ padding: '10px 14px', borderRadius: 8, background: 'var(--success-bg)', color: 'var(--success)', fontSize: '0.875rem', fontWeight: 500 }}>
+                  {actionInfo}
+                </div>
+              )}
             </div>
           )}
 
@@ -244,7 +247,7 @@ export default function ExpenseDetailPage() {
                 </button>
               )}
               {canDelete && (
-                <button className="btn btn-danger" onClick={handleDeleteExpense}>
+                <button className="btn btn-danger" onClick={() => setDeleteModalOpen(true)}>
                   Eliminar gasto
                 </button>
               )}
@@ -269,7 +272,7 @@ export default function ExpenseDetailPage() {
                       padding: 12,
                       cursor: canClaim ? 'pointer' : 'default',
                       borderColor: selected ? 'var(--primary)' : undefined,
-                      background: selected ? '#edf8fa' : undefined,
+                      background: selected ? 'var(--primary-bg)' : undefined,
                       textAlign: 'left',
                     }}
                   >
@@ -310,7 +313,7 @@ export default function ExpenseDetailPage() {
               </div>
               <div className="kpi">
                 <p className="muted" style={{ margin: 0, fontWeight: 700 }}>Total de tu parte</p>
-                <p className="kpi-value" style={{ margin: 0, color: 'var(--primary-strong)' }}>${myTotal.toFixed(2)}</p>
+                <p className="kpi-value" style={{ margin: 0, color: 'var(--primary)' }}>${myTotal.toFixed(2)}</p>
               </div>
               <p className="muted" style={{ margin: 0, fontSize: '.86rem' }}>
                 El cálculo respeta el prorrateo por reclamantes y el ajuste de centavos definido para el pagador.
@@ -319,6 +322,16 @@ export default function ExpenseDetailPage() {
           </aside>
         </section>
       </section>
+
+      <ConfirmModal
+        open={deleteModalOpen}
+        title="Eliminar gasto"
+        message="¿Eliminar este gasto? Esta acción no se puede deshacer."
+        confirmLabel="Eliminar"
+        danger
+        onConfirm={() => { setDeleteModalOpen(false); void handleDeleteExpense(); }}
+        onCancel={() => setDeleteModalOpen(false)}
+      />
     </main>
   );
 }
