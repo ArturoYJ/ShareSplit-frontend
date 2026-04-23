@@ -1,0 +1,10 @@
+node_modules
+.next
+.env.local
+.env.*.local
+*.test.*
+*.spec.*
+README.md
+.git
+.gitignore
+Dockerfile.check
