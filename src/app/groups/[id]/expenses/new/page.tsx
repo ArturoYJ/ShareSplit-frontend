@@ -30,7 +30,6 @@ export default function NewExpensePage() {
   ]);
 
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
 
   useEffect(() => {
     if (authLoading) return;
@@ -72,17 +71,16 @@ export default function NewExpensePage() {
       .filter((item) => item.name && item.unit_price >= 0 && item.quantity > 0);
 
     if (!title.trim()) {
-      setError('El título del gasto es obligatorio.');
+      toastError('El título del gasto es obligatorio.');
       return;
     }
 
     if (normalizedItems.length === 0) {
-      setError('Agrega al menos un ítem válido.');
+      toastError('Agrega al menos un ítem válido.');
       return;
     }
 
     setLoading(true);
-    setError('');
 
     const payload: ExpenseCreateInput = {
       title: title.trim(),
