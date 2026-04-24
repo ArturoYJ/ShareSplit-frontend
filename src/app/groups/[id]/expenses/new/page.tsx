@@ -113,7 +113,7 @@ export default function NewExpensePage() {
           <span>←</span> Volver al grupo
         </Link>
 
-        <article className="card" style={{ padding: 40 }}>
+        <article className="card" style={{ padding: 'clamp(20px, 5vw, 40px)' }}>
           <h1 className="h1" style={{ fontSize: '2.5rem' }}>Nuevo Gasto</h1>
           <p className="muted" style={{ marginTop: 8 }}>
             Ingresa los detalles del ticket. El total se calculará solo.
@@ -166,9 +166,9 @@ export default function NewExpensePage() {
             </div>
 
             <section className="stack" style={{ gap: 16, marginTop: 12 }}>
-              <div className="justify-between">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <h3 className="h3">Desglose de Ítems</h3>
-                <button type="button" className="btn btn-secondary" onClick={addItem} style={{ padding: '8px 16px' }}>
+                <button type="button" className="btn btn-secondary" onClick={addItem} style={{ padding: '8px 16px', width: '100%' }}>
                   + Agregar Ítem
                 </button>
               </div>
@@ -176,8 +176,8 @@ export default function NewExpensePage() {
               {items.map((item, index) => (
                 <div
                   key={item.id}
-                  className="card-flat"
-                  style={{ padding: 20, display: 'grid', gap: 16, gridTemplateColumns: '2fr 1fr 1fr auto', alignItems: 'end' }}
+                  className="card-flat expense-item-card"
+                  style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}
                 >
                   <div>
                     <label className="label" style={{ fontSize: '0.7rem' }}>Producto</label>
@@ -189,52 +189,52 @@ export default function NewExpensePage() {
                       required
                     />
                   </div>
-                  <div>
-                    <label className="label" style={{ fontSize: '0.7rem' }}>Precio Unit.</label>
-                    <input
-                      className="input"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      placeholder="0.00"
-                      value={item.unit_price}
-                      onChange={(e) => updateItem(index, 'unit_price', e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="label" style={{ fontSize: '0.7rem' }}>Cant.</label>
-                    <input
-                      className="input"
-                      type="number"
-                      min="1"
-                      step="1"
-                      placeholder="1"
-                      value={item.quantity}
-                      onChange={(e) => updateItem(index, 'quantity', e.target.value)}
-                      required
-                    />
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <div>
+                      <label className="label" style={{ fontSize: '0.7rem' }}>Precio Unit.</label>
+                      <input
+                        className="input"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={item.unit_price}
+                        onChange={(e) => updateItem(index, 'unit_price', e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="label" style={{ fontSize: '0.7rem' }}>Cant.</label>
+                      <input
+                        className="input"
+                        type="number"
+                        min="1"
+                        step="1"
+                        placeholder="1"
+                        value={item.quantity}
+                        onChange={(e) => updateItem(index, 'quantity', e.target.value)}
+                        required
+                      />
+                    </div>
                   </div>
                   <button
                     type="button"
                     className="btn btn-danger"
                     onClick={() => removeItem(index)}
                     disabled={items.length === 1}
-                    style={{ padding: 12 }}
+                    style={{ width: '100%', padding: 12 }}
                     title="Eliminar ítem"
                   >
-                    🗑️
+                    🗑️ Eliminar
                   </button>
                 </div>
               ))}
             </section>
 
-            <div style={{ background: 'var(--primary)', color: 'white', padding: '24px 32px', borderRadius: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <p style={{ opacity: 0.8, fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>Total a Pagar</p>
-                <p style={{ fontSize: '2rem', fontWeight: 800 }}>${total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
-              </div>
-              <button className="btn" type="submit" disabled={loading} style={{ background: 'white', color: 'var(--primary)', padding: '16px 32px', fontSize: '1.1rem' }}>
+            <div style={{ background: 'var(--primary)', color: 'white', padding: 'clamp(20px, 4vw, 32px)', borderRadius: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, textAlign: 'center' }}>
+              <p style={{ opacity: 0.8, fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>Total a Pagar</p>
+              <p style={{ fontSize: 'clamp(1.5rem, 5vw, 2rem)', fontWeight: 800 }}>${total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+              <button className="btn" type="submit" disabled={loading} style={{ background: 'white', color: 'var(--primary)', padding: '16px 32px', fontSize: '1.1rem', width: '100%' }}>
                 {loading ? 'Guardando...' : 'Crear Gasto'}
               </button>
             </div>
