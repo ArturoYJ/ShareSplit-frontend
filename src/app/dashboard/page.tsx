@@ -115,18 +115,18 @@ export default function DashboardPage() {
       <div className="shell" style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
 
         {/* Page header */}
-        <div className="justify-between row-mobile">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
             <h1 className="h1">Mis grupos</h1>
             <p className="muted" style={{ marginTop: 4 }}>
               {user?.name.split(' ')[0]} · {groups.length} {groups.length === 1 ? 'grupo' : 'grupos'}
             </p>
           </div>
-          <div className="row-wrap">
-            <button className="btn btn-secondary" onClick={() => setShowJoin(true)}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%' }}>
+            <button className="btn btn-secondary" style={{ width: '100%' }} onClick={() => setShowJoin(true)}>
               Unirme con código
             </button>
-            <Link href="/groups/new" className="btn btn-primary">
+            <Link href="/groups/new" className="btn btn-primary" style={{ width: '100%', textAlign: 'center' }}>
               Nuevo grupo
             </Link>
           </div>
