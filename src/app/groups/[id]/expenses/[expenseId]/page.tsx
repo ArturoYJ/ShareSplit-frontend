@@ -174,8 +174,15 @@ export default function ExpenseDetailPage() {
 
   if (authLoading || loading) {
     return (
-      <main className="page centered">
-        <p className="muted">Cargando gasto...</p>
+      <main className="page">
+        <section className="shell stack" style={{ gap: 14 }}>
+          <div className="skeleton skeleton-text" style={{ width: 140 }} />
+          <div className="skeleton skeleton-card" style={{ height: 160 }} />
+          <div className="grid grid-2col" style={{ gridTemplateColumns: '2fr 1fr', gap: 20 }}>
+            <div className="skeleton skeleton-card" style={{ height: 300 }} />
+            <div className="skeleton skeleton-card" style={{ height: 200 }} />
+          </div>
+        </section>
       </main>
     );
   }
@@ -197,7 +204,7 @@ export default function ExpenseDetailPage() {
     (myRole === 'owner' || expense.paid_by === user?.id);
 
   return (
-    <main className="page">
+    <main className="page fade-in">
       <section className="shell stack" style={{ gap: 14 }}>
         <Link href={`/groups/${groupId}`} className="muted" style={{ fontSize: '.9rem' }}>
           ← Volver al grupo
@@ -235,7 +242,7 @@ export default function ExpenseDetailPage() {
           )}
 
           {(canPublish || canSettle || canDelete) && (
-            <div className="row-wrap" style={{ marginTop: 12 }}>
+            <div className="row-wrap mobile-stack" style={{ marginTop: 12 }}>
               {canPublish && (
                 <button className="btn btn-primary" onClick={() => updateStatus('open')}>
                   Publicar gasto
@@ -255,7 +262,7 @@ export default function ExpenseDetailPage() {
           )}
         </article>
 
-        <section className="grid" style={{ gridTemplateColumns: '2fr 1fr' }}>
+        <section className="grid grid-2col" style={{ gridTemplateColumns: '2fr 1fr', gap: 20 }}>
           <article className="card" style={{ padding: 16 }}>
             <h2 className="h3" style={{ marginBottom: 10 }}>Ítems y reclamos</h2>
             <div className="stack" style={{ gap: 10 }}>

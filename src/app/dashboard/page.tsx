@@ -102,16 +102,37 @@ export default function DashboardPage() {
     }
   };
 
+  // Close join modal on Escape
+  useEffect(() => {
+    if (!showJoin) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowJoin(false);
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [showJoin]);
+
   if (authLoading || loading) {
     return (
-      <main className="page centered">
-        <p className="muted">Cargando...</p>
+      <main className="page">
+        <div className="shell" style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+          <div>
+            <div className="skeleton skeleton-title" />
+            <div className="skeleton skeleton-text" style={{ width: 160 }} />
+          </div>
+          <hr className="divider" />
+          <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>
+            <div className="skeleton skeleton-card" />
+            <div className="skeleton skeleton-card" />
+            <div className="skeleton skeleton-card" />
+          </div>
+        </div>
       </main>
     );
   }
 
   return (
-    <main className="page">
+    <main className="page fade-in">
       <div className="shell" style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
 
         {/* Page header */}

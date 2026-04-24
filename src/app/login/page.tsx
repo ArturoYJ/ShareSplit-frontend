@@ -41,7 +41,7 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="page centered">
+    <main className="page centered fade-in">
       <div style={{ width: 'min(400px, 100%)', display: 'flex', flexDirection: 'column', gap: 24 }}>
 
         {/* Header */}

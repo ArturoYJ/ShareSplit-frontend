@@ -215,14 +215,26 @@ export default function GroupDetailPage() {
 
   if (authLoading || loading) {
     return (
-      <main className="page centered">
-        <p className="muted">Cargando grupo...</p>
+      <main className="page">
+        <div className="shell" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+          <div>
+            <div className="skeleton skeleton-text" style={{ width: 100, marginBottom: 8 }} />
+            <div className="skeleton skeleton-title" style={{ width: '50%' }} />
+          </div>
+          <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+            <div className="skeleton skeleton-kpi" />
+            <div className="skeleton skeleton-kpi" />
+            <div className="skeleton skeleton-kpi" />
+          </div>
+          <div className="skeleton skeleton-card" />
+          <div className="skeleton skeleton-card" />
+        </div>
       </main>
     );
   }
 
   return (
-    <main className="page">
+    <main className="page fade-in">
       <div className="shell" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
 
         {/* Page header */}
@@ -238,11 +250,11 @@ export default function GroupDetailPage() {
               </span>
             </div>
           </div>
-          <div className="row-wrap">
-            <button className="btn btn-secondary" onClick={copyInvite}>
-              {copied ? 'Copiado' : `Código: ${groupData?.group.invite_code || '---'}`}
+          <div className="row-wrap mobile-stack">
+            <button className="btn btn-secondary mobile-full" onClick={copyInvite}>
+              {copied ? 'Copiado ✓' : `Código: ${groupData?.group.invite_code || '---'}`}
             </button>
-            <Link href={`/groups/${groupId}/expenses/new`} className="btn btn-primary">
+            <Link href={`/groups/${groupId}/expenses/new`} className="btn btn-primary mobile-full" style={{ textAlign: 'center' }}>
               + Nuevo gasto
             </Link>
           </div>
@@ -332,12 +344,12 @@ export default function GroupDetailPage() {
           {isOwner && (
             <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--line)' }}>
               <label className="label">Transferir administración</label>
-              <div className="row-wrap">
+              <div className="row-wrap mobile-stack">
                 <select
                   className="select"
                   value={transferTarget}
                   onChange={(e) => setTransferTarget(e.target.value)}
-                  style={{ flex: 1, minWidth: 180 }}
+                  style={{ flex: 1, minWidth: 0 }}
                 >
                   <option value="">Selecciona un miembro</option>
                   {groupData?.members
@@ -345,7 +357,7 @@ export default function GroupDetailPage() {
                     .map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
                 </select>
                 <button
-                  className="btn btn-secondary"
+                  className="btn btn-secondary mobile-full"
                   disabled={!transferTarget || busyAction === 'transfer-owner'}
                   onClick={handleTransferOwner}
                 >

@@ -125,14 +125,24 @@ export default function BalancesPage() {
 
   if (authLoading || loading) {
     return (
-      <main className="page centered">
-        <p className="muted">Calculando balances...</p>
+      <main className="page">
+        <section className="shell stack" style={{ gap: 14 }}>
+          <div>
+            <div className="skeleton skeleton-text" style={{ width: 140 }} />
+            <div className="skeleton skeleton-title" />
+          </div>
+          <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 20 }}>
+            <div className="skeleton skeleton-card" style={{ height: 150 }} />
+            <div className="skeleton skeleton-card" style={{ height: 150 }} />
+          </div>
+          <div className="skeleton skeleton-card" style={{ height: 200 }} />
+        </section>
       </main>
     );
   }
 
   return (
-    <main className="page">
+    <main className="page fade-in">
       <section className="shell stack" style={{ gap: 14 }}>
         <div className="justify-between row-mobile">
           <div>
@@ -148,7 +158,7 @@ export default function BalancesPage() {
           )}
         </div>
 
-        <section className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 20 }}>
+        <section className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 20 }}>
           {balances.map((balance) => (
             <article className="card" key={balance.user_id}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
@@ -179,7 +189,7 @@ export default function BalancesPage() {
           ))}
         </section>
 
-        <section className="card" style={{ padding: 32 }}>
+        <section className="card" style={{ padding: 'clamp(20px, 4vw, 32px)' }}>
           <h2 className="h3" style={{ marginBottom: 24 }}>Deudas Simplificadas</h2>
           {debts.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '32px 16px', border: '1px dashed var(--line)', borderRadius: 10 }}>
@@ -193,7 +203,7 @@ export default function BalancesPage() {
 
                 return (
                   <div className="card-flat" style={{ padding: '20px 24px' }} key={key}>
-                    <div className="justify-between row-mobile">
+                    <div className="justify-between mobile-stack" style={{ gap: 12 }}>
                       <div>
                         <p style={{ fontWeight: 600, fontSize: '0.9375rem', marginBottom: 3 }}>
                           {debt.from_name} → {debt.to_name}

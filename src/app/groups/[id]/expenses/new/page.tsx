@@ -107,7 +107,7 @@ export default function NewExpensePage() {
   };
 
   return (
-    <main className="page">
+    <main className="page fade-in">
       <section className="shell stack" style={{ gap: 14 }}>
         <Link href={`/groups/${groupId}`} className="muted" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span>←</span> Volver al grupo
